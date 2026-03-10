@@ -12,11 +12,16 @@ type Worker struct {
 	id       int
 	task     task
 	finishCh chan<- int
+	wg       *sync.WaitGroup
 }
 
 func (w *Worker) ExeTask() {
-	w.task()
-	fmt.Println("Worker", w.id, "is executing task")
+	w.wg.Add(1)
+	defer w.wg.Done()
+	i := w.task()
+
+	time.Sleep(500 * time.Millisecond)
+	fmt.Println("Worker", w.id, "is executing task ", i)
 	w.finishCh <- w.id
 }
 
@@ -46,8 +51,9 @@ func NewManager(minWorkers, maxWorkers int) *Manager {
 }
 
 func (m *Manager) cleaner() {
+
 	for id := range m.finishCh {
-		fmt.Println("Worker", id, "has finished task")
+		fmt.Println("finished", id)
 		// Move worker back to idle pool
 		for i, worker := range *m.workerPool["working"] {
 			if worker.id == id {
@@ -57,7 +63,6 @@ func (m *Manager) cleaner() {
 			}
 		}
 	}
-	m.wg.Done()
 }
 
 func (m *Manager) Start() {
@@ -65,12 +70,12 @@ func (m *Manager) Start() {
 		worker := Worker{
 			id:       i,
 			finishCh: m.finishCh,
+			wg:       m.wg,
 		}
 
 		*m.workerPool["idle"] = append(*m.workerPool["idle"], worker)
 	}
 
-	m.wg.Add(2)
 	go m.cleaner()
 	go func() {
 		for t := range m.taskCh {
@@ -81,10 +86,20 @@ func (m *Manager) Start() {
 				*m.workerPool["idle"] = (*m.workerPool["idle"])[1:]
 				worker.task = t
 				*m.workerPool["working"] = append(*m.workerPool["working"], worker)
-				m.wg.Add(1)
 				go worker.ExeTask()
 			} else {
-				fmt.Println("No idle workers available, task is waiting")
+				if len(*m.workerPool["working"]) < m.maxWorkers {
+					worker := Worker{
+						id:       len(*m.workerPool["working"]) + len(*m.workerPool["idle"]),
+						task:     t,
+						finishCh: m.finishCh,
+						wg:       m.wg,
+					}
+					*m.workerPool["working"] = append(*m.workerPool["working"], worker)
+					go worker.ExeTask()
+				} else {
+					fmt.Println("All workers are busy, task is waiting")
+				}
 			}
 		}
 	}()
@@ -108,13 +123,13 @@ func main() {
 
 	for i := 0; i < 5; i++ {
 		task := func() int {
-			time.Sleep(500 * time.Millisecond)
+
 			return i
 		}
-
+		fmt.Println("adding task", i)
 		manager.AddTask(task)
-		fmt.Println("added task", i)
-	}
 
+	}
+	time.Sleep(5 * time.Second)
 	manager.Stop()
 }
