@@ -43,7 +43,7 @@ func NewManager(minWorkers, maxWorkers int) *Manager {
 	return &Manager{
 		minWorkers: minWorkers,
 		maxWorkers: maxWorkers,
-		taskCh:     make(chan task),
+		taskCh:     make(chan task, maxWorkers),
 		finishCh:   make(chan int),
 		workerPool: pool,
 		wg:         &sync.WaitGroup{},
@@ -89,6 +89,7 @@ func (m *Manager) Start() {
 				go worker.ExeTask()
 			} else {
 				if len(*m.workerPool["working"]) < m.maxWorkers {
+					fmt.Println("scheduling worker")
 					worker := Worker{
 						id:       len(*m.workerPool["working"]) + len(*m.workerPool["idle"]),
 						task:     t,
@@ -106,7 +107,9 @@ func (m *Manager) Start() {
 }
 
 func (m *Manager) AddTask(t task) {
+
 	m.taskCh <- t
+	fmt.Println("added task")
 }
 
 func (m *Manager) Stop() {
@@ -126,7 +129,7 @@ func main() {
 
 			return i
 		}
-		fmt.Println("adding task", i)
+		fmt.Println("creating task ", i)
 		manager.AddTask(task)
 
 	}
