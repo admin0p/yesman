@@ -34,6 +34,7 @@ func (pm *PoolMaster) GetWorker(MaxWorker int) *worker.Worker {
 	}
 
 	finishedWorker := <-pm.finishCh
+	*finishedWorker = worker.Worker{}
 	return finishedWorker
 }
 
