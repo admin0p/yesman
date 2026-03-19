@@ -1,8 +1,6 @@
 package main
 
-import (
-	uppermanagement "yesman/boss"
-)
+import "yesman/uppermanagement"
 
 func main() {
 
