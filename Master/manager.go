@@ -1,15 +1,25 @@
-package uppermanagement
+package master
 
 import (
 	"sync"
 	"yesman/worker"
 )
 
+// the roles that master expects from the worker pool
 type WorkerPool interface {
 	GetFinishCh() chan<- *worker.Worker
 	GetWorker(maxW int) *worker.Worker
 	AddWorker(w *worker.Worker)
 	Close()
+}
+
+// This is the main orchestrator , this is responsible to control the task assignment to worker
+type WorkerManager struct {
+	maxWorker  int
+	minWorker  int
+	wg         *sync.WaitGroup
+	WorkerPool WorkerPool
+	TaskChan   chan worker.Task
 }
 
 func NewWorkerManager(minW int, maxW int) *WorkerManager {
@@ -19,14 +29,6 @@ func NewWorkerManager(minW int, maxW int) *WorkerManager {
 		wg:        &sync.WaitGroup{},
 		TaskChan:  make(chan worker.Task),
 	}
-}
-
-type WorkerManager struct {
-	maxWorker  int
-	minWorker  int
-	wg         *sync.WaitGroup
-	WorkerPool WorkerPool
-	TaskChan   chan worker.Task
 }
 
 func (wm *WorkerManager) Start() error {
@@ -59,7 +61,8 @@ func (wm *WorkerManager) Start() error {
 			}(scapeGoat)
 
 		}
-		// close. the finish channels
+
+		// close. poolMaster
 		wm.WorkerPool.Close()
 	}()
 
