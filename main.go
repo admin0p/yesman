@@ -1,12 +1,12 @@
 package main
 
-import "yesman/uppermanagement"
+import master "yesman/Master"
 
 func main() {
 
 	// inti workerManager
 
-	newWm := uppermanagement.NewWorkerManager(1, 3)
+	newWm := master.NewWorkerManager(1, 3)
 	newWm.Start()
 
 	// cerate task
