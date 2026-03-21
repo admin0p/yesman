@@ -1,16 +1,21 @@
 package worker
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+
+	"github.com/rs/xid"
+)
 
 type Task func() int
 
 type Worker struct {
-	id   int
+	id   string
 	task Task
 }
 
-func NewWorker(id int) *Worker {
-	return &Worker{id: id}
+func NewWorker() *Worker {
+	return &Worker{id: xid.New().String()}
 }
 
 func workerLog(message string) {
@@ -22,12 +27,13 @@ func (w *Worker) AssignTask(task Task) {
 }
 
 func (w *Worker) Run() (int, *Worker) {
-	workerLog(fmt.Sprintf("worker %d received task", w.id))
 	result := w.task()
-	workerLog(fmt.Sprintf("Finished task with result := %d", result))
+
+	time.Sleep(2 * time.Second)
+
 	return result, w
 }
 
-func (w *Worker) GetId() int {
+func (w *Worker) GetId() string {
 	return w.id
 }

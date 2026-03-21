@@ -1,8 +1,8 @@
 package master
 
 import (
+	"context"
 	"fmt"
-	"sync"
 	"yesman/worker"
 )
 
@@ -14,7 +14,7 @@ type PoolMaster struct {
 	idlePoolAvailableCh chan struct{}
 }
 
-func NewPoolMaster(wg *sync.WaitGroup) *PoolMaster {
+func NewPoolMaster(ctx context.Context) *PoolMaster {
 
 	pm := &PoolMaster{
 		IdleWorker:          []*worker.Worker{},
@@ -22,8 +22,6 @@ func NewPoolMaster(wg *sync.WaitGroup) *PoolMaster {
 		finishCh:            make(chan *worker.Worker),
 		idlePoolAvailableCh: make(chan struct{}),
 	}
-	wg.Add(1)
-	defer wg.Done()
 
 	go pm.managerPool()
 	return pm
@@ -48,21 +46,31 @@ func (pm *PoolMaster) getWorkerFromIdle() *worker.Worker {
 // this function retrieves an available worker from the pool or
 // creates a new one if the maximum limit is not reached
 // If the maximum limit is reached, it waits for a worker to finish and reuses it.
-func (pm *PoolMaster) GetWorker(MaxWorker int) *worker.Worker {
+func (pm *PoolMaster) GetWorker(ctx context.Context, maxWorker int) *worker.Worker {
 	if len(pm.IdleWorker) > 0 {
+		//fmt.Println("SCHEDULER-1: from idle pool")
 		return pm.getWorkerFromIdle()
 	}
 
-	if len(pm.IdleWorker)+len(pm.ActiveWorker) < MaxWorker {
-		w := worker.NewWorker(len(pm.IdleWorker) + len(pm.ActiveWorker) + 1)
+	if len(pm.IdleWorker)+len(pm.ActiveWorker) < maxWorker {
+		w := worker.NewWorker()
+		//fmt.Println("SCHEDULER-1: creating new worker ", w.GetId())
 		pm.ActiveWorker = append(pm.ActiveWorker, w)
 		return w
 	}
 
 	select {
-	case w := <-pm.finishCh:
+	case w, ok := <-pm.finishCh:
+		if !ok {
+			return nil
+		}
+		fmt.Println("SCHEDULER: from finish task ", w.GetId())
 		return w
-	case <-pm.idlePoolAvailableCh:
+	case _, ok := <-pm.idlePoolAvailableCh:
+		if !ok {
+			return nil
+		}
+		fmt.Println("SCHEDULER: from idle pool")
 		return pm.getWorkerFromIdle()
 	}
 
@@ -70,24 +78,31 @@ func (pm *PoolMaster) GetWorker(MaxWorker int) *worker.Worker {
 
 // cleaner function the manages the transfer of active to idle pool when some worker finishes
 func (pm *PoolMaster) managerPool() {
-
 	for w := range pm.finishCh {
 		for i, activeWorker := range pm.ActiveWorker {
-			fmt.Println("CLEANER: moving worker ", w.GetId(), " from active to idle")
 			if activeWorker == w {
 				pm.ActiveWorker = append(pm.ActiveWorker[:i], pm.ActiveWorker[i+1:]...)
 				break
 			}
 		}
-		pm.IdleWorker = append(pm.IdleWorker, w)
 		pm.idlePoolAvailableCh <- struct{}{}
 	}
-
+	fmt.Println("DONE AND DUSTED")
 }
 
 func (pm *PoolMaster) Close() {
-	for w := range pm.finishCh {
-		fmt.Println("CLEANER_CLOSE: cleaned worker ", w.GetId())
-	}
 	close(pm.finishCh)
+	for finishEvent := range pm.finishCh {
+		fmt.Println("DRAINING_FINISH_EVENT: worker ", finishEvent.GetId())
+	}
+	close(pm.idlePoolAvailableCh)
+	for range pm.idlePoolAvailableCh {
+		fmt.Println("DRAINING_IDLE")
+	}
+}
+
+func (pm *PoolMaster) GetAllWorker() []*worker.Worker {
+	allWorkers := make([]*worker.Worker, 0, len(pm.ActiveWorker))
+	allWorkers = append(allWorkers, pm.ActiveWorker...)
+	return allWorkers
 }
