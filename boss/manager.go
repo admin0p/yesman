@@ -33,11 +33,7 @@ func NewWorkerManager(minW int, maxW int) *WorkerManager {
 
 func (wm *WorkerManager) Start() error {
 	autoIncrId := 0
-	wm.WorkerPool = &PoolMaster{
-		finishCh:     make(chan *worker.Worker),
-		IdleWorker:   make([]*worker.Worker, 0),
-		ActiveWorker: make([]*worker.Worker, 0),
-	}
+	wm.WorkerPool = NewPoolMaster(wm.wg)
 
 	for i := 0; i < wm.minWorker; i++ {
 		// new worker

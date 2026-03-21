@@ -1,9 +1,12 @@
 package main
 
-import master "yesman/Master"
+import (
+	"fmt"
+	master "yesman/boss"
+)
 
 func main() {
-
+	fmt.Println("Starting Worker Manager...")
 	// inti workerManager
 
 	newWm := master.NewWorkerManager(1, 3)
