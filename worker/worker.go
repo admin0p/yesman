@@ -2,7 +2,6 @@ package worker
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/xid"
 )
@@ -29,7 +28,7 @@ func (w *Worker) AssignTask(task Task) {
 func (w *Worker) Run() (int, *Worker) {
 	result := w.task()
 
-	time.Sleep(2 * time.Second)
+	//time.Sleep( * time.Second)
 
 	return result, w
 }

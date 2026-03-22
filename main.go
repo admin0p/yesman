@@ -12,7 +12,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	newWm := master.NewWorkerManager(ctx, 0, 1)
+	newWm := master.NewWorkerManager(ctx, 1, 2)
 	newWm.Start()
 
 	// cerate task

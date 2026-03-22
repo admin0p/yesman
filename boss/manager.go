@@ -10,7 +10,8 @@ import (
 // the roles that master expects from the worker pool
 type WorkerPool interface {
 	GetFinishCh() chan<- *worker.Worker
-	GetWorker(ctx context.Context, maxW int) *worker.Worker
+	GetIdlePushChan() <-chan struct{}
+	GetWorker(maxW int) *worker.Worker
 	AddWorker(w *worker.Worker)
 	GetAllWorker() []*worker.Worker //test function
 	Close()
@@ -50,34 +51,34 @@ func (wm *WorkerManager) Start() error {
 		w := worker.NewWorker()
 		wm.WorkerPool.AddWorker(w)
 	}
-
+	wm.wg.Add(1)
 	go func() {
+		defer wm.wg.Done()
 		for t := range wm.TaskChan {
 			fmt.Println("MANAGER: trying to get worker ")
-			scapeGoat := wm.WorkerPool.GetWorker(wm.ctx, wm.maxWorker)
+			scapeGoat := wm.WorkerPool.GetWorker(wm.maxWorker)
 			if scapeGoat == nil {
-				fmt.Println("MANAGER: received nil worker")
-				continue
+				<-wm.WorkerPool.GetIdlePushChan()
+				scapeGoat = wm.WorkerPool.GetWorker(wm.maxWorker)
 			}
 			fmt.Println("MANAGER: got worker ", scapeGoat.GetId())
 			scapeGoat.AssignTask(t)
 			wm.wg.Add(1)
+			fmt.Println("ADDED")
 			go func(w *worker.Worker) {
 
 				fmt.Println("MANAGER-WORKER: running worker ", w.GetId())
 				res, goodGoat := w.Run()
 
-				wm.WorkerPool.GetFinishCh() <- goodGoat
-
+				ch := wm.WorkerPool.GetFinishCh()
+				fmt.Println("WORKER : chan", ch)
+				ch <- goodGoat
 				fmt.Println("MANAGER-WORKER: worker ", goodGoat.GetId(), " finished task with result ", res)
 				wm.wg.Done()
 
 			}(scapeGoat)
 
 		}
-
-		// close. poolMaster
-		// wm.WorkerPool.Close()
 	}()
 
 	return nil
@@ -88,8 +89,10 @@ func (wm *WorkerManager) PushTask(t worker.Task) {
 }
 
 func (wm *WorkerManager) Stop() error {
+	fmt.Println("MANAGER: CLOSINGr")
 	close(wm.TaskChan)
 	wm.wg.Wait()
+	fmt.Println("WAITING DONE")
 	wm.WorkerPool.Close()
 	return nil
 }
