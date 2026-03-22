@@ -7,7 +7,10 @@ import (
 	"yesman/worker"
 )
 
-// pool master is responsible to circulate workers within the pool
+// The loyal dog to the master (Yes man)
+// Like that every irritating person in office
+// who pokes his nose into everyone's business but does not mind his own
+// Similarly, this dude tracks all worker's activity and gives up the idle ones to master when he asks
 type PoolMaster struct {
 	IdleWorker          []*worker.Worker
 	ActiveWorker        []*worker.Worker
@@ -31,6 +34,7 @@ func NewPoolMaster() *PoolMaster {
 }
 
 // returns the finish chan so that workers can signal their completion
+// the worker push their task results here
 func (pm *PoolMaster) GetFinishCh() chan<- *worker.Worker {
 	return pm.finishCh
 }
@@ -93,7 +97,6 @@ func (pm *PoolMaster) managePool(wg *sync.WaitGroup) {
 		}
 	}
 	close(pm.idlePoolAvailableCh)
-	//pm.idlePoolAvailableCh <- struct{}{}
 	fmt.Println("DONE AND DUSTED")
 }
 

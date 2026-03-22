@@ -7,15 +7,12 @@ import (
 	"yesman/worker"
 )
 
-// the roles that master expects from the worker pool
-type WorkerPool interface {
-	GetFinishCh() chan<- *worker.Worker
-	GetWorker(maxW int) *worker.Worker
-	AddWorker(w *worker.Worker)
-	Close()
-}
-
-// This is the main orchestrator , this is responsible to control the task assignment to worker
+// The YesMan
+// Yes man manager (YesManManager) is your typical yes man who never says no to anything
+// and does not do the work themselves and delegates to the poor workers :(
+// this thing also does the same thing -
+// this might look stupid in real life but unlike humans computers are purely emotionless so they don't care
+// so this is quiet an interesting system in computer world
 type YesManManager struct {
 	maxWorker int
 	minWorker int
@@ -26,6 +23,23 @@ type YesManManager struct {
 	TaskChan   chan worker.Task
 }
 
+// this is the biggest tool or asset to the yes men
+// like in our daily corporate life there is always a person who like a loyal dog to the yes man
+// this is the lOYAL DOG!!
+//
+//	This is basically an interface or traits or personality expected from the "LOYAL DOG"
+//
+// I should have kept the name as LoyalDogTraits but that will confuse people so keeping this more understandable
+// So this basically like that irritating guy in the office who always snitches about other people
+// similarly this tracks the worker who is idle and when manager asks for a free worker it "snitches" on them
+type WorkerPool interface {
+	GetFinishCh() chan<- *worker.Worker
+	GetWorker(maxW int) *worker.Worker
+	AddWorker(w *worker.Worker)
+	Close()
+}
+
+// Gives a new yes man
 func NewYesMan(minW int, maxW int) *YesManManager {
 
 	return &YesManManager{
