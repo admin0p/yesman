@@ -12,11 +12,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	newWm := master.NewWorkerManager(ctx, 1, 2)
+	newWm := master.NewWorkerManager(ctx, 1, 3)
 	newWm.Start()
 
 	// cerate task
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 10; i++ {
 		t := func() int {
 			return i
 		}

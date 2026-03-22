@@ -3,6 +3,7 @@ package master
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"yesman/worker"
 )
@@ -58,8 +59,8 @@ func (wm *WorkerManager) Start() error {
 			fmt.Println("MANAGER: trying to get worker ")
 			scapeGoat := wm.WorkerPool.GetWorker(wm.maxWorker)
 			if scapeGoat == nil {
-				<-wm.WorkerPool.GetIdlePushChan()
-				scapeGoat = wm.WorkerPool.GetWorker(wm.maxWorker)
+				fmt.Println("HOGAYA :)")
+				os.Exit(1)
 			}
 			fmt.Println("MANAGER: got worker ", scapeGoat.GetId())
 			scapeGoat.AssignTask(t)

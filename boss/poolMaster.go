@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 	"yesman/worker"
 )
 
@@ -22,7 +23,7 @@ func NewPoolMaster(ctx context.Context) *PoolMaster {
 		IdleWorker:          []*worker.Worker{},
 		ActiveWorker:        []*worker.Worker{},
 		finishCh:            make(chan *worker.Worker, 2),
-		idlePoolAvailableCh: make(chan struct{}, 2),
+		idlePoolAvailableCh: make(chan struct{}),
 		wg:                  &sync.WaitGroup{},
 	}
 
@@ -67,8 +68,14 @@ func (pm *PoolMaster) GetWorker(maxWorker int) *worker.Worker {
 		pm.ActiveWorker = append(pm.ActiveWorker, w)
 		return w
 	}
+	fmt.Println("Waiting idle worker ...")
+	for {
+		time.Sleep(10 * time.Millisecond)
+		if w := pm.getWorkerFromIdle(); w != nil {
+			return w
+		}
+	}
 
-	return nil
 }
 
 // cleaner function the manages the transfer of active to idle pool when some worker finishes
@@ -85,22 +92,19 @@ func (pm *PoolMaster) managerPool(wg *sync.WaitGroup) {
 				break
 			}
 		}
-		pm.idlePoolAvailableCh <- struct{}{}
 	}
+	close(pm.idlePoolAvailableCh)
 	//pm.idlePoolAvailableCh <- struct{}{}
 	fmt.Println("DONE AND DUSTED")
 }
 
 func (pm *PoolMaster) Close() {
 	close(pm.finishCh)
-	// for finishEvent := range pm.finishCh {
-	fmt.Println("DRAINING_FINISH_EVENT: worker ")
-	// }
+	for finishEvent := range pm.finishCh {
+		fmt.Println("DRAINING_FINISH_EVENT: worker ", finishEvent.GetId())
+	}
 	pm.wg.Wait()
-	fmt.Println("PM: waiting done")
-	<-pm.idlePoolAvailableCh
-	fmt.Println("DRAINING_IDLE_EVENT: ida ")
-	close(pm.idlePoolAvailableCh)
+	fmt.Println("PM_CLOSE: waiting done")
 
 }
 
