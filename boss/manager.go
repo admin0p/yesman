@@ -73,7 +73,7 @@ func (yesMan *YesManManager) Start() error {
 
 			scapeGoat.AssignTask(t)
 			yesMan.wg.Add(1)
-			fmt.Println("ADDED")
+
 			go func(w *worker.Worker) {
 
 				fmt.Println("YES_MAN: running worker ", w.GetId())
@@ -95,10 +95,8 @@ func (yesMan *YesManManager) PushTask(t worker.Task) {
 }
 
 func (yesMan *YesManManager) Stop() error {
-	fmt.Println("MANAGER: CLOSINGr")
 	close(yesMan.TaskChan)
 	yesMan.wg.Wait()
-	fmt.Println("WAITING DONE")
 	yesMan.WorkerPool.Close()
 	return nil
 }
