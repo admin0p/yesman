@@ -1,7 +1,6 @@
 package master
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -17,7 +16,7 @@ type PoolMaster struct {
 	wg                  *sync.WaitGroup
 }
 
-func NewPoolMaster(ctx context.Context) *PoolMaster {
+func NewPoolMaster() *PoolMaster {
 
 	pm := &PoolMaster{
 		IdleWorker:          []*worker.Worker{},
@@ -27,7 +26,7 @@ func NewPoolMaster(ctx context.Context) *PoolMaster {
 		wg:                  &sync.WaitGroup{},
 	}
 
-	go pm.managerPool(pm.wg)
+	go pm.managePool(pm.wg)
 	return pm
 }
 
@@ -79,7 +78,7 @@ func (pm *PoolMaster) GetWorker(maxWorker int) *worker.Worker {
 }
 
 // cleaner function the manages the transfer of active to idle pool when some worker finishes
-func (pm *PoolMaster) managerPool(wg *sync.WaitGroup) {
+func (pm *PoolMaster) managePool(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 	for w := range pm.finishCh {
@@ -106,20 +105,4 @@ func (pm *PoolMaster) Close() {
 	pm.wg.Wait()
 	fmt.Println("PM_CLOSE: waiting done")
 
-}
-
-func (pm *PoolMaster) GetAllWorker() []*worker.Worker {
-	allWorkers := make([]*worker.Worker, 0, len(pm.ActiveWorker))
-	allWorkers = append(allWorkers, pm.ActiveWorker...)
-	return allWorkers
-}
-
-func (pm *PoolMaster) GetIdleWorkers() []*worker.Worker {
-	allWorkers := make([]*worker.Worker, 0, len(pm.IdleWorker))
-	allWorkers = append(allWorkers, pm.IdleWorker...)
-	return allWorkers
-}
-
-func (pm *PoolMaster) GetIdlePushChan() <-chan struct{} {
-	return pm.idlePoolAvailableCh
 }
