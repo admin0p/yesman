@@ -8,7 +8,7 @@ import (
 func main() {
 	fmt.Println("Starting Worker Manager...")
 
-	yesMan := master.NewYesMan(1, 3)
+	yesMan := master.NewYesMan(1, 3, nil)
 	yesMan.Start()
 
 	// cerate task

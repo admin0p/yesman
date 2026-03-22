@@ -1,8 +1,8 @@
 package master
 
 import (
+	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"yesman/worker"
 )
@@ -19,7 +19,7 @@ type YesManManager struct {
 
 	wg *sync.WaitGroup
 
-	WorkerPool WorkerPool
+	WorkerPool WorkerManager
 	TaskChan   chan worker.Task
 }
 
@@ -32,7 +32,7 @@ type YesManManager struct {
 // I should have kept the name as LoyalDogTraits but that will confuse people so keeping this more understandable
 // So this basically like that irritating guy in the office who always snitches about other people
 // similarly this tracks the worker who is idle and when manager asks for a free worker it "snitches" on them
-type WorkerPool interface {
+type WorkerManager interface {
 	GetFinishCh() chan<- *worker.Worker
 	GetWorker(maxW int) *worker.Worker
 	AddWorker(w *worker.Worker)
@@ -40,54 +40,52 @@ type WorkerPool interface {
 }
 
 // Gives a new yes man
-func NewYesMan(minW int, maxW int) *YesManManager {
+func NewYesMan(minW int, maxW int, poolMaster WorkerManager) *YesManManager {
 
 	return &YesManManager{
-		minWorker: minW,
-		maxWorker: maxW,
-		wg:        &sync.WaitGroup{},
-		TaskChan:  make(chan worker.Task),
+		minWorker:  minW,
+		maxWorker:  maxW,
+		WorkerPool: poolMaster,
+		wg:         &sync.WaitGroup{},
+		TaskChan:   make(chan worker.Task),
 	}
 }
 
 func (yesMan *YesManManager) Start() error {
 
-	yesMan.WorkerPool = NewPoolMaster()
+	if yesMan.WorkerPool == nil {
+		yesMan.WorkerPool = NewBusybody(yesMan.maxWorker)
+	}
 
 	for i := 0; i < yesMan.minWorker; i++ {
 
 		w := worker.NewWorker()
 		yesMan.WorkerPool.AddWorker(w)
 	}
-	yesMan.wg.Add(1)
-	go func() {
-		defer yesMan.wg.Done()
+
+	yesMan.wg.Go(func() {
 		for t := range yesMan.TaskChan {
-			fmt.Println("MANAGER: trying to get worker ")
+
 			scapeGoat := yesMan.WorkerPool.GetWorker(yesMan.maxWorker)
 			if scapeGoat == nil {
-				fmt.Println("HOGAYA :)")
-				os.Exit(1)
+				panic(errors.New("Got a nil worker"))
 			}
-			fmt.Println("MANAGER: got worker ", scapeGoat.GetId())
+
 			scapeGoat.AssignTask(t)
 			yesMan.wg.Add(1)
 			fmt.Println("ADDED")
 			go func(w *worker.Worker) {
 
-				fmt.Println("MANAGER-WORKER: running worker ", w.GetId())
+				fmt.Println("YES_MAN: running worker ", w.GetId())
 				res, goodGoat := w.Run()
-
-				ch := yesMan.WorkerPool.GetFinishCh()
-				fmt.Println("WORKER : chan", ch)
-				ch <- goodGoat
-				fmt.Println("MANAGER-WORKER: worker ", goodGoat.GetId(), " finished task with result ", res)
+				yesMan.WorkerPool.GetFinishCh() <- goodGoat
+				fmt.Println("YES_MAN: worker ", goodGoat.GetId(), " finished task with result ", res)
 				yesMan.wg.Done()
 
 			}(scapeGoat)
 
 		}
-	}()
+	})
 
 	return nil
 }
