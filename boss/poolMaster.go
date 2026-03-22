@@ -3,7 +3,6 @@ package master
 import (
 	"fmt"
 	"sync"
-	"time"
 	"yesman/worker"
 )
 
@@ -69,9 +68,8 @@ func (bb *Busybody) GetWorker(maxWorker int) *worker.Worker {
 		bb.ActiveWorker = append(bb.ActiveWorker, w)
 		return w
 	}
-
+	// blocks till it gets a idle worker
 	for {
-		time.Sleep(10 * time.Millisecond)
 		if w := bb.getWorkerFromIdle(); w != nil {
 			return w
 		}
