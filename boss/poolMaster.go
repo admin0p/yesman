@@ -1,15 +1,16 @@
 package master
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"time"
 	"yesman/worker"
 )
 
-// pool master is responsible to circulate workers within the pool
-type PoolMaster struct {
+// The loyal dog to the master (Yes man)
+// Like that every irritating person in office
+// who pokes his nose into everyone's business but does not mind his own
+// Similarly, this dude tracks all worker's activity and gives up the idle ones to master when he asks
+type Busybody struct {
 	IdleWorker          []*worker.Worker
 	ActiveWorker        []*worker.Worker
 	finishCh            chan *worker.Worker
@@ -17,61 +18,59 @@ type PoolMaster struct {
 	wg                  *sync.WaitGroup
 }
 
-func NewPoolMaster(ctx context.Context) *PoolMaster {
+func NewBusybody(bufferSize int) *Busybody {
 
-	pm := &PoolMaster{
+	bb := &Busybody{
 		IdleWorker:          []*worker.Worker{},
 		ActiveWorker:        []*worker.Worker{},
-		finishCh:            make(chan *worker.Worker, 2),
+		finishCh:            make(chan *worker.Worker, bufferSize),
 		idlePoolAvailableCh: make(chan struct{}),
 		wg:                  &sync.WaitGroup{},
 	}
 
-	go pm.managerPool(pm.wg)
-	return pm
+	go bb.managePool(bb.wg)
+	return bb
 }
 
 // returns the finish chan so that workers can signal their completion
-func (pm *PoolMaster) GetFinishCh() chan<- *worker.Worker {
-	return pm.finishCh
+// the worker push their task results here
+func (bb *Busybody) GetFinishCh() chan<- *worker.Worker {
+	return bb.finishCh
 }
 
-func (pm *PoolMaster) AddWorker(w *worker.Worker) {
-	pm.IdleWorker = append(pm.IdleWorker, w)
+func (bb *Busybody) AddWorker(w *worker.Worker) {
+	bb.IdleWorker = append(bb.IdleWorker, w)
 }
 
-func (pm *PoolMaster) getWorkerFromIdle() *worker.Worker {
-	if len(pm.IdleWorker) == 0 {
+func (bb *Busybody) getWorkerFromIdle() *worker.Worker {
+	if len(bb.IdleWorker) == 0 {
 		return nil
 	}
-	w := pm.IdleWorker[0]
+	w := bb.IdleWorker[0]
 	if w == nil {
 		return nil
 	}
-	pm.IdleWorker = pm.IdleWorker[1:]
-	pm.ActiveWorker = append(pm.ActiveWorker, w)
+	bb.IdleWorker = bb.IdleWorker[1:]
+	bb.ActiveWorker = append(bb.ActiveWorker, w)
 	return w
 }
 
 // this function retrieves an available worker from the pool or
 // creates a new one if the maximum limit is not reached
 // If the maximum limit is reached, it waits for a worker to finish and reuses it.
-func (pm *PoolMaster) GetWorker(maxWorker int) *worker.Worker {
-	if len(pm.IdleWorker) > 0 {
-		//fmt.Println("SCHEDULER-1: from idle pool")
-		return pm.getWorkerFromIdle()
+func (bb *Busybody) GetWorker(maxWorker int) *worker.Worker {
+	if len(bb.IdleWorker) > 0 {
+		return bb.getWorkerFromIdle()
 	}
 
-	if len(pm.IdleWorker)+len(pm.ActiveWorker) < maxWorker {
+	if len(bb.IdleWorker)+len(bb.ActiveWorker) < maxWorker {
 		w := worker.NewWorker()
-		//fmt.Println("SCHEDULER-1: creating new worker ", w.GetId())
-		pm.ActiveWorker = append(pm.ActiveWorker, w)
+		bb.ActiveWorker = append(bb.ActiveWorker, w)
 		return w
 	}
-	fmt.Println("Waiting idle worker ...")
+	// blocks till it gets a idle worker
 	for {
-		time.Sleep(10 * time.Millisecond)
-		if w := pm.getWorkerFromIdle(); w != nil {
+		if w := bb.getWorkerFromIdle(); w != nil {
 			return w
 		}
 	}
@@ -79,47 +78,29 @@ func (pm *PoolMaster) GetWorker(maxWorker int) *worker.Worker {
 }
 
 // cleaner function the manages the transfer of active to idle pool when some worker finishes
-func (pm *PoolMaster) managerPool(wg *sync.WaitGroup) {
+func (bb *Busybody) managePool(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
-	for w := range pm.finishCh {
-		for i, activeWorker := range pm.ActiveWorker {
+	for w := range bb.finishCh {
+		for i, activeWorker := range bb.ActiveWorker {
 			if activeWorker == w {
-				fmt.Println("Freeing worker ", activeWorker.GetId())
-				pm.ActiveWorker = append(pm.ActiveWorker[:i], pm.ActiveWorker[i+1:]...)
+				bb.ActiveWorker = append(bb.ActiveWorker[:i], bb.ActiveWorker[i+1:]...)
 				newWorker := worker.NewWorker()
-				pm.IdleWorker = append(pm.IdleWorker, newWorker)
+				bb.IdleWorker = append(bb.IdleWorker, newWorker)
 				break
 			}
 		}
 	}
-	close(pm.idlePoolAvailableCh)
-	//pm.idlePoolAvailableCh <- struct{}{}
-	fmt.Println("DONE AND DUSTED")
+	close(bb.idlePoolAvailableCh)
+	fmt.Println("BUSYBODY: DONE AND DUSTED")
 }
 
-func (pm *PoolMaster) Close() {
-	close(pm.finishCh)
-	for finishEvent := range pm.finishCh {
+// Drains the finish channel and waits for the managerPool function to finish
+func (bb *Busybody) Close() {
+	close(bb.finishCh)
+	for finishEvent := range bb.finishCh {
 		fmt.Println("DRAINING_FINISH_EVENT: worker ", finishEvent.GetId())
 	}
-	pm.wg.Wait()
-	fmt.Println("PM_CLOSE: waiting done")
+	bb.wg.Wait()
 
-}
-
-func (pm *PoolMaster) GetAllWorker() []*worker.Worker {
-	allWorkers := make([]*worker.Worker, 0, len(pm.ActiveWorker))
-	allWorkers = append(allWorkers, pm.ActiveWorker...)
-	return allWorkers
-}
-
-func (pm *PoolMaster) GetIdleWorkers() []*worker.Worker {
-	allWorkers := make([]*worker.Worker, 0, len(pm.IdleWorker))
-	allWorkers = append(allWorkers, pm.IdleWorker...)
-	return allWorkers
-}
-
-func (pm *PoolMaster) GetIdlePushChan() <-chan struct{} {
-	return pm.idlePoolAvailableCh
 }

@@ -6,7 +6,11 @@ import (
 	"github.com/rs/xid"
 )
 
-type Task func() int
+type Task interface {
+	Exec() error
+	RetryExec() error
+	GetIdentifier() int
+}
 
 type Worker struct {
 	id   string
@@ -26,11 +30,13 @@ func (w *Worker) AssignTask(task Task) {
 }
 
 func (w *Worker) Run() (int, *Worker) {
-	result := w.task()
-
+	err := w.task.Exec()
+	if err != nil {
+		fmt.Println("error in task")
+	}
 	//time.Sleep( * time.Second)
 
-	return result, w
+	return w.task.GetIdentifier(), w
 }
 
 func (w *Worker) GetId() string {
