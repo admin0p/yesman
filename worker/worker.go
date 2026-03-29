@@ -25,10 +25,11 @@ func (w *Worker) AssignTask(task Task) {
 	w.task = task
 }
 
-func (w *Worker) Run() (int, *Worker) {
+func (w *Worker) Run(errCh chan<- error) (int, *Worker) {
 	err := w.task.Exec()
 	if err != nil {
 		fmt.Println("error in task")
+		errCh <- err
 	}
 	//time.Sleep( * time.Second)
 

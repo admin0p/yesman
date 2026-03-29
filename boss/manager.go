@@ -17,6 +17,12 @@ type YesManManager struct {
 	maxWorker int
 	minWorker int
 
+	// retry count for a task in case of failure
+	maxTaskRetry int
+	// exponential backoff for retrying the task in case of failure
+	RetryExpoBackOff int
+	ErrorChan        chan error
+
 	wg *sync.WaitGroup
 
 	WorkerPool WorkerManager
@@ -43,11 +49,14 @@ type WorkerManager interface {
 func NewYesMan(minW int, maxW int, poolMaster WorkerManager) *YesManManager {
 
 	return &YesManManager{
-		minWorker:  minW,
-		maxWorker:  maxW,
-		WorkerPool: poolMaster,
-		wg:         &sync.WaitGroup{},
-		TaskChan:   make(chan worker.Task),
+		minWorker:        minW,
+		maxWorker:        maxW,
+		WorkerPool:       poolMaster,
+		maxTaskRetry:     2,
+		RetryExpoBackOff: 2,
+		ErrorChan:        make(chan error),
+		wg:               &sync.WaitGroup{},
+		TaskChan:         make(chan worker.Task),
 	}
 }
 
@@ -77,7 +86,7 @@ func (yesMan *YesManManager) Start() error {
 			go func(w *worker.Worker) {
 
 				fmt.Println("YES_MAN: running worker ", w.GetId())
-				res, goodGoat := w.Run()
+				res, goodGoat := w.Run(yesMan.ErrorChan)
 				yesMan.WorkerPool.GetFinishCh() <- goodGoat
 				fmt.Println("YES_MAN: worker ", goodGoat.GetId(), " finished task with result ", res)
 				yesMan.wg.Done()
