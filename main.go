@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	master "yesman/boss"
+	yesman "yesman/boss"
 )
 
 type task struct {
@@ -33,7 +33,7 @@ func main() {
 	fmt.Println("Starting Worker Manager...")
 
 	errCh := make(chan error)
-	yesMan := master.NewYesMan(1, 3, nil, errCh)
+	yesMan := yesman.NewYesMan(1, 3, nil, errCh)
 	yesMan.Start()
 
 	// cerate task
