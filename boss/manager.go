@@ -65,7 +65,14 @@ func (wr WorkerRules) GetErrorChan() chan<- error {
 }
 
 // Gives a new yes man
-func NewYesMan(minW int, maxW int, poolMaster WorkerManager, errCh chan error) *YesManManager {
+// we dont want to control how the error tasks are handled
+// these tasks are failed even after retries so the control should be given to the user of the yes man
+// TODO : pass these as options instead of parameters
+func NewYesMan(
+	minW int, maxW int,
+	poolMaster WorkerManager,
+	errCh chan error,
+) *YesManManager {
 
 	return &YesManManager{
 		minWorker:   minW,
