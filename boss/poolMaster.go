@@ -16,14 +16,16 @@ type Busybody struct {
 	finishCh            chan *worker.Worker
 	idlePoolAvailableCh chan struct{}
 	wg                  *sync.WaitGroup
+	workerRules         WorkerRules
 }
 
-func NewBusybody(bufferSize int) *Busybody {
+func NewBusybody(bufferSize int, workerRules WorkerRules) *Busybody {
 
 	bb := &Busybody{
 		IdleWorker:          []*worker.Worker{},
 		ActiveWorker:        []*worker.Worker{},
 		finishCh:            make(chan *worker.Worker, bufferSize),
+		workerRules:         workerRules,
 		idlePoolAvailableCh: make(chan struct{}),
 		wg:                  &sync.WaitGroup{},
 	}
@@ -64,7 +66,7 @@ func (bb *Busybody) GetWorker(maxWorker int) *worker.Worker {
 	}
 
 	if len(bb.IdleWorker)+len(bb.ActiveWorker) < maxWorker {
-		w := worker.NewWorker()
+		w := worker.NewWorker(bb.workerRules)
 		bb.ActiveWorker = append(bb.ActiveWorker, w)
 		return w
 	}
@@ -85,7 +87,7 @@ func (bb *Busybody) managePool(wg *sync.WaitGroup) {
 		for i, activeWorker := range bb.ActiveWorker {
 			if activeWorker == w {
 				bb.ActiveWorker = append(bb.ActiveWorker[:i], bb.ActiveWorker[i+1:]...)
-				newWorker := worker.NewWorker()
+				newWorker := worker.NewWorker(bb.workerRules)
 				bb.IdleWorker = append(bb.IdleWorker, newWorker)
 				break
 			}

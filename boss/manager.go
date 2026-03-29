@@ -17,6 +17,9 @@ type YesManManager struct {
 	maxWorker int
 	minWorker int
 
+	// retry count for a task in case of failure
+	workerRules WorkerRules
+
 	wg *sync.WaitGroup
 
 	WorkerPool WorkerManager
@@ -39,27 +42,57 @@ type WorkerManager interface {
 	Close()
 }
 
+// just a worker rules as to what a worker can do
+// This should match the capabilities of the worker
+// checkout the poor worker code as to what they can do and what they can't do
+// NOTE: even though a yesman manager is an emotionless machine,
+// it should not assign a task to a poor worker that is not capable of doing it :)
+type WorkerRules struct {
+	RetryCount  int
+	ExpoBackOff int
+	// channel to send task that failed to execute after retrying
+	ErrorChan chan error
+}
+
+func (wr WorkerRules) GetRetryCount() int {
+	return wr.RetryCount
+}
+func (wr WorkerRules) GetExpoBackOff() int {
+	return wr.ExpoBackOff
+}
+func (wr WorkerRules) GetErrorChan() chan<- error {
+	return wr.ErrorChan
+}
+
 // Gives a new yes man
-func NewYesMan(minW int, maxW int, poolMaster WorkerManager) *YesManManager {
+// we dont want to control how the error tasks are handled
+// these tasks are failed even after retries so the control should be given to the user of the yes man
+// TODO : pass these as options instead of parameters
+func NewYesMan(
+	minW int, maxW int,
+	poolMaster WorkerManager,
+	errCh chan error,
+) *YesManManager {
 
 	return &YesManManager{
-		minWorker:  minW,
-		maxWorker:  maxW,
-		WorkerPool: poolMaster,
-		wg:         &sync.WaitGroup{},
-		TaskChan:   make(chan worker.Task),
+		minWorker:   minW,
+		maxWorker:   maxW,
+		WorkerPool:  poolMaster,
+		workerRules: WorkerRules{RetryCount: 3, ExpoBackOff: 2, ErrorChan: errCh},
+		wg:          &sync.WaitGroup{},
+		TaskChan:    make(chan worker.Task),
 	}
 }
 
 func (yesMan *YesManManager) Start() error {
 
 	if yesMan.WorkerPool == nil {
-		yesMan.WorkerPool = NewBusybody(yesMan.maxWorker)
+		yesMan.WorkerPool = NewBusybody(yesMan.maxWorker, yesMan.workerRules)
 	}
 
 	for i := 0; i < yesMan.minWorker; i++ {
 
-		w := worker.NewWorker()
+		w := worker.NewWorker(yesMan.workerRules)
 		yesMan.WorkerPool.AddWorker(w)
 	}
 
@@ -77,7 +110,7 @@ func (yesMan *YesManManager) Start() error {
 			go func(w *worker.Worker) {
 
 				fmt.Println("YES_MAN: running worker ", w.GetId())
-				res, goodGoat := w.Run()
+				res, goodGoat := w.Run(yesMan.workerRules.GetErrorChan())
 				yesMan.WorkerPool.GetFinishCh() <- goodGoat
 				fmt.Println("YES_MAN: worker ", goodGoat.GetId(), " finished task with result ", res)
 				yesMan.wg.Done()
