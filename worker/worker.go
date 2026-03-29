@@ -21,10 +21,6 @@ func NewWorker() *Worker {
 	return &Worker{id: xid.New().String()}
 }
 
-func workerLog(message string) {
-	fmt.Println("WORKER:{ ", message, " }")
-}
-
 func (w *Worker) AssignTask(task Task) {
 	w.task = task
 }
