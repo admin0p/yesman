@@ -32,7 +32,8 @@ func (t *task) GetIdentifier() int {
 func main() {
 	fmt.Println("Starting Worker Manager...")
 
-	yesMan := master.NewYesMan(1, 3, nil)
+	errCh := make(chan error)
+	yesMan := master.NewYesMan(1, 3, nil, errCh)
 	yesMan.Start()
 
 	// cerate task
@@ -40,6 +41,11 @@ func main() {
 		t := NewTask(i, fmt.Sprintf(" :) %d", i))
 		yesMan.PushTask(t)
 	}
+
 	fmt.Println("MAIN: closing")
 	yesMan.Stop()
+	close(errCh)
+	for err := range errCh {
+		fmt.Println("Error received from worker: ", err)
+	}
 }
